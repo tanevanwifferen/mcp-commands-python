@@ -125,6 +125,7 @@ class CliServer(Group):
         return self.server.streamable_http_app(**kwargs)
 
     def _register_tools(self) -> None:
+        sample = helptext.example(self) or 'issue create "Title" --priority 1'
         for name in (self.help_tool_name, self.run_tool_name):
             try:
                 self.mcp.remove_tool(name)
@@ -164,6 +165,13 @@ class CliServer(Group):
                 logger.exception("command %r failed", command)
                 return _text(f"{type(e).__name__}: {e}", error=True)
 
+        # Name the server and use a sample from its own tree (annotations are
+        # strings under `from __future__ import annotations`, so set the real one).
+        run.__annotations__["command"] = Annotated[
+            str,
+            pydantic.Field(description=f"One {self.name} command line: path, arguments, options. E.g. {sample}"),
+        ]
+
         help_description = (
             "List the commands of this server and show how to call them. "
             'help() lists the top-level commands, help("<group>") a group\'s commands, '
@@ -178,10 +186,16 @@ class CliServer(Group):
         self.mcp.add_tool(
             help,
             name=self.help_tool_name,
+            title=f"{self.name}: list commands",
             description=help_description,
             annotations=ToolAnnotations(read_only_hint=True),
         )
-        self.mcp.add_tool(run, name=self.run_tool_name, description=helptext.USAGE)
+        self.mcp.add_tool(
+            run,
+            name=self.run_tool_name,
+            title=f"{self.name}: run a command",
+            description=helptext.run_description(self),
+        )
 
 
 def _text(text: str, error: bool = False) -> CallToolResult:

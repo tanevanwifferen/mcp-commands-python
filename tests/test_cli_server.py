@@ -137,6 +137,12 @@ async def test_over_mcp() -> None:
         assert [t.name for t in tools] == ["help", "run"]
         help_tool = next(t for t in tools if t.name == "help")
         assert "issue …" in (help_tool.description or "")
+        run_tool = next(t for t in tools if t.name == "run")
+        assert run_tool.title == "beads: run a command"
+        assert run_tool.description.startswith("beads: ")
+        assert "Top-level commands: issue …, filter, ready." in run_tool.description
+        assert "e.g. issue create <title>." in run_tool.description
+        assert "beads command line" in run_tool.input_schema["properties"]["command"]["description"]
 
         result = await client.call_tool("help", {"path": "issue"})
         assert not result.is_error and "create <title>" in _text(result)

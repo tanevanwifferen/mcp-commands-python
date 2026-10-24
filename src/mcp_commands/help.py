@@ -7,13 +7,51 @@ from typing import Any
 
 from mcp_commands.tree import Command, Group, Param
 
-USAGE = (
-    "Run a command with run(command, args?). The command is one line, like a shell: "
-    'the command path, then positional arguments, then --options, e.g. issue create "Fix login" --priority 1. '
-    "Values are parsed as JSON when the parameter is not a string. "
-    'Repeat an array option, or pass a JSON array (--tags \'["a","b"]\'). '
-    "Structured values can go in args instead, as an object keyed by parameter name."
-)
+def usage(example: str) -> str:
+    """How to write a command line, with `example` as the sample."""
+    return (
+        "Run a command with run(command, args?). The command is one line, like a shell: "
+        f"the command path, then positional arguments, then --options, e.g. {example}. "
+        "Values are parsed as JSON when the parameter is not a string. "
+        'Repeat an array option, or pass a JSON array (--tags \'["a","b"]\'). '
+        "Structured values can go in args instead, as an object keyed by parameter name."
+    )
+
+
+USAGE = usage('issue create "Fix login" --priority 1')
+
+
+def example(group: Group) -> str | None:
+    """A sample command line from the tree: the first command with a required
+    argument (its path and required arguments as placeholders), else the first command."""
+    first: str | None = None
+    stack: list[tuple[Group, list[str]]] = [(group, [])]
+    while stack:
+        node, path = stack.pop(0)
+        for child in node.children.values():
+            if isinstance(child, Group):
+                stack.append((child, [*path, child.name]))
+                continue
+            line = " ".join([*path, child.name])
+            required = [f"<{p.name}>" for p in child.params if p.positional and p.required]
+            if required:
+                return " ".join([line, *required])
+            first = first or line
+    return first
+
+
+def run_description(group: Group) -> str:
+    """The run tool's description: what the server is, its top-level commands
+    and how to write a command line, so each server's run tool reads as its own."""
+    out = [f"{group.name}: {group.help}"] if group.help else []
+    names = ", ".join(f"{c.name} …" if isinstance(c, Group) else c.name for c in group.children.values())
+    line = f"Run a {group.name} command."
+    if names:
+        line += f" Top-level commands: {names}."
+    out.append(line + ' help("<command>") shows a command\'s arguments and options.')
+    sample = example(group)
+    out.append(usage(sample) if sample else USAGE)
+    return "\n\n".join(out)
 
 
 def render(node: Group | Command, path: list[str], depth: int = 1) -> str:
