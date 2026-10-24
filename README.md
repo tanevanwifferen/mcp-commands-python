@@ -132,7 +132,7 @@ parameter values, for input that is awkward to quote.
 Errors are written for the model to act on:
 
 ```
-priority: Input should be less than or equal to 4 (got 9)
+priority: Input should be less than or equal to 4 (got integer)
 
 Usage: issue create <title> [priority] [deps...] [options]
 ...

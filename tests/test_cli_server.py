@@ -1,7 +1,8 @@
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from mcp import Client
+from pydantic import BaseModel
 
 from mcp_commands import CliServer, CommandError, UsageError
 
@@ -11,6 +12,11 @@ pytestmark = pytest.mark.anyio
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+class Where(BaseModel):
+    state: Literal["open", "closed"]
+    tags: list[str] = []
 
 
 def make_app() -> CliServer:
@@ -40,6 +46,11 @@ def make_app() -> CliServer:
     def add(id: str, labels: list[str]) -> list[str]:
         """Add labels."""
         return labels
+
+    @app.command(name="filter")
+    def filter_issues(*, where: Where) -> dict:
+        """Filter issues."""
+        return where.model_dump()
 
     @app.command()
     def ready() -> None:
@@ -143,3 +154,15 @@ async def test_over_mcp() -> None:
 
 def _text(result: Any) -> str:
     return result.content[0].text
+
+
+async def test_errors_name_types_paths_and_keys() -> None:
+    app = make_app()
+    with pytest.raises(UsageError, match=r"^priority: .* \(got string\)"):
+        await app.execute("issue create x high")
+    with pytest.raises(UsageError, match=r"^deps\.1: .* \(got integer\); deps\.2: .* \(got boolean\)\n"):
+        await app.execute("issue create x", {"deps": ["a", 1, True]})
+    with pytest.raises(UsageError, match=r"^title: .* \(got object \{en, nl\}\)"):
+        await app.execute("issue create", {"title": {"en": "x", "nl": "y"}})
+    with pytest.raises(UsageError, match=r"^--where\.state: missing required property"):
+        await app.execute("filter", {"where": {"tags": ["a"]}})

@@ -290,9 +290,32 @@ def _format_validation_error(error: pydantic.ValidationError, command: Command) 
         param = command.param(name)
         label = (name if param and param.positional else param.flag) if param else name
         where = ".".join(str(x) for x in e["loc"][1:])
-        if e["type"] == "missing":
+        if e["type"] == "missing" and not where:
             problems.append(f"missing required argument <{name}>")
+        elif e["type"] == "missing":
+            problems.append(f"{label}.{where}: missing required property")
         else:
-            got = e.get("input")
-            problems.append(f"{label}{'.' + where if where else ''}: {e['msg']} (got {got!r})")
+            problems.append(f"{label}{'.' + where if where else ''}: {e['msg']} (got {_describe(e.get('input'))})")
     return "; ".join(problems)
+
+
+def _describe(value: Any) -> str:
+    """The JSON type of a value for error messages, with an object's keys, rather than the value itself."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, (list, tuple, set)):
+        return "array"
+    if isinstance(value, dict):
+        if not value:
+            return "object"
+        keys = [str(k) for k in value]
+        return "object {" + ", ".join(keys[:10] + (["…"] if len(keys) > 10 else [])) + "}"
+    return type(value).__name__
